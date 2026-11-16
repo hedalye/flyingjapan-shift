@@ -23,3 +23,30 @@
 .slot-choice.picked .choice-check{color:#2e60d9}.all-choice{grid-column:1/-1}
 .clear-day{margin-top:12px;width:100%}
 @media(max-width:700px){.month-calendar{gap:3px}.cal-day{min-height:54px;font-size:12px;border-radius:8px}.cal-empty{min-height:54px}.cal-dots{gap:2px}.dot{width:6px;height:6px}.day-editor{padding:14px}.slot-choice{padding:11px;min-height:65px}.slot-choice small{font-size:10px}}
+
+/* Administrator month calendar & month-local Monday-Sunday weekly hours */
+.admin-calendar-layout{display:grid;grid-template-columns:minmax(0,1.45fr) minmax(280px,.85fr);gap:20px;align-items:start}
+.admin-month-calendar{max-width:none;align-content:start}
+.admin-cal-day{min-height:88px;align-items:stretch;text-align:left;justify-content:flex-start;gap:5px;padding:5px!important}
+.admin-cal-day>b{font-size:12px;line-height:1.2}
+.admin-cal-assignments{display:flex;flex-direction:column;gap:3px;width:100%;min-width:0}
+.admin-cal-shift{display:flex;align-items:center;gap:4px;min-width:0;font-size:10px;color:#9aa5b5;white-space:nowrap}
+.admin-cal-shift.filled{color:#29435a;font-weight:650}
+.admin-cal-shift>span{overflow:hidden;text-overflow:ellipsis}
+.admin-cal-shift .dot{width:6px;height:6px}
+.admin-day-editor{max-width:none;position:sticky;top:12px}
+.admin-day-slots{display:grid;gap:11px}
+.admin-slot-row{margin:0;display:flex;align-items:center;gap:12px;justify-content:space-between;padding:10px;background:#fff;border:1px solid #e5eaf2;border-radius:10px}
+.admin-slot-row>span{min-width:108px;display:flex;flex-wrap:wrap;align-items:center;gap:5px}
+.admin-slot-row small{width:100%;color:#8492a6;font-size:10px;padding-left:13px}
+.admin-slot-row select{width:min(165px,55%);margin:0;font-size:12px;padding:9px}
+.week-summary-head{margin-top:24px}.week-summary-head h3{font-size:16px;margin:0}
+.week-summary-list{display:grid;gap:10px;margin-top:14px}
+.week-summary-row{display:flex;gap:12px;border:1px solid #e5eaf2;background:#fafbfd;border-radius:12px;padding:12px 14px;align-items:center}
+.week-title{min-width:160px;font-weight:750;font-size:13px}
+.week-title small{font-size:11px;font-weight:500;color:#75839a;display:block;margin-top:4px}
+.week-hours{display:flex;gap:9px;flex-wrap:wrap;flex:1}
+.week-hours-staff{display:flex;align-items:center;gap:8px;border-radius:9px;background:#fff;border:1px solid #e5eaf2;padding:9px 12px;font-size:12px}
+.week-hours-staff strong{font-size:14px;color:#2357b7}.week-hours-staff small{color:#8796a9}
+@media(max-width:850px){.admin-calendar-layout{grid-template-columns:1fr}.admin-day-editor{position:static}.week-summary-row{display:block}.week-hours{margin-top:10px}.week-title{min-width:0}}
+@media(max-width:480px){.admin-cal-day{min-height:77px;padding:3px!important}.admin-cal-shift{font-size:8px;gap:2px}.admin-cal-shift .dot{width:4px;height:4px}.week-hours-staff{padding:7px}.admin-slot-row>span{min-width:86px}}

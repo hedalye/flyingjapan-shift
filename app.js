@@ -41,9 +41,9 @@ function renderStaff(){
  $('myConfirmed').innerHTML=confirmed.length?confirmed.map(x=>`<span>${Number(activeMonth.split('-')[1])}/${x.day} · ${safe(x.slot)}</span>`).join(''):'확정된 시프트가 없습니다.';
 }
 function renderStaffCalendar(){
- const first=new Date(Number(activeMonth.slice(0,4)),Number(activeMonth.slice(5))-1,1).getDay();
- const weekdays=['일','월','화','수','목','금','토'];
- const html=weekdays.map((w,i)=>`<div class="cal-weekday ${i===0?'sunday':''}">${w}</div>`).join('')+
+ const first=(new Date(Number(activeMonth.slice(0,4)),Number(activeMonth.slice(5))-1,1).getDay()+6)%7;
+ const weekdays=['월','화','수','목','금','토','일'];
+ const html=weekdays.map((w,i)=>`<div class="cal-weekday ${i===6?'sunday':''}">${w}</div>`).join('')+
  Array.from({length:first},()=>'<div class="cal-empty" aria-hidden="true"></div>').join('')+
  days.map(d=>{
    const active=slots.filter(s=>selections.has(k(d.day,s)));
@@ -53,7 +53,7 @@ function renderStaffCalendar(){
  $('staffCalendar').innerHTML=html;
  $('staffCalendar').querySelectorAll('.cal-day').forEach(b=>b.addEventListener('click',()=>{selectedDay=Number(b.dataset.day);renderStaffCalendar()}));
  const chosen=slots.filter(s=>selections.has(k(selectedDay,s)));
- $('selectedDateTitle').textContent=`${Number(activeMonth.slice(5))}월 ${selectedDay}일 (${weekdays[new Date(Number(activeMonth.slice(0,4)),Number(activeMonth.slice(5))-1,selectedDay).getDay()]})`;
+ $('selectedDateTitle').textContent=`${Number(activeMonth.slice(5))}월 ${selectedDay}일 (${weekday[new Date(Number(activeMonth.slice(0,4)),Number(activeMonth.slice(5))-1,selectedDay).getDay()]})`;
  const expired=closed()||!data.is_public;
  $('staffSlotButtons').innerHTML=slots.map((s,i)=>`<button type="button" class="slot-choice ${chosen.includes(s)?'picked':''}" data-slot="${s}" ${expired?'disabled':''}><span><b>${s}</b><small>${['09:00–15:00','10:00–16:00','15:00–21:00'][i]}</small></span><span class="choice-check">${chosen.includes(s)?'✓':'+'}</span></button>`).join('')+`<button type="button" class="slot-choice all-choice ${chosen.length===3?'picked':''}" data-all="true" ${expired?'disabled':''}><span><b>모두 가능</b><small>오픈1 · 오픈2 · 마감 모두 가능</small></span><span class="choice-check">${chosen.length===3?'✓':'+'}</span></button>`;
  $('staffSlotButtons').querySelectorAll('[data-slot]').forEach(b=>b.addEventListener('click',()=>{const key=k(selectedDay,b.dataset.slot);selections.has(key)?selections.delete(key):selections.add(key);renderStaffCalendar();updateCounts()}));
@@ -64,7 +64,59 @@ $('clearDay').addEventListener('click',()=>{slots.forEach(s=>selections.delete(k
 function updateCounts(){$('countSlots').textContent=selections.size;$('countDays').textContent=new Set([...selections].map(x=>x.split(':')[0])).size}
 $('save').addEventListener('click',async()=>{const btn=$('save');btn.disabled=true;msg('saveMsg','저장 중...');try{const list=[...selections].map(x=>{const [day,slot]=x.split(':');return{day:Number(day),slot}});await rpc('shift_month_save',{p_token:token,p_month:activeMonth,p_slots:list,p_weekly:$('weekly').value,p_notes:$('notes').value});msg('saveMsg','신청 내용이 저장되었습니다. 마감 전까지 다시 수정할 수 있습니다.',true);await load()}catch(e){msg('saveMsg',e.message)}finally{btn.disabled=closed()||!data.is_public}});
 function mapStaff(){return Object.fromEntries(data.staff.map(x=>[x.id,x.name]))}
-function renderAdmin(){const names=mapStaff();$('staffCount').textContent=data.staff.length;$('requestCount').textContent=data.availability.length;$('confirmedCount').textContent=`${data.confirmed.length} / ${days.length*3}`;$('staffTags').innerHTML=data.staff.map(x=>`<span class="tag">${safe(x.name)}</span>`).join('');const sel=$('filterStaff');const previous=sel.value;sel.innerHTML='<option value="all">전체 직원</option>'+data.staff.map(x=>`<option value="${x.id}">${safe(x.name)}</option>`).join('');sel.value=[...sel.options].some(o=>o.value===previous)?previous:'all';$('adminGrid').innerHTML=days.map(d=>`<tr class="${d.weekend?'weekend':''}"><td>${d.label}</td>${slots.map(slot=>{const eligible=data.availability.filter(a=>a.day===d.day&&a.slot===slot);const confirmed=data.confirmed.find(c=>c.day===d.day&&c.slot===slot);return `<td><select aria-label="${d.label} ${slot}" data-day="${d.day}" data-slot="${slot}"><option value="">미배정</option>${eligible.map(a=>`<option value="${a.staff_id}" ${confirmed?.staff_id===a.staff_id?'selected':''}>${safe(names[a.staff_id]||'알 수 없음')}</option>`).join('')}</select></td>`}).join('')}</tr>`).join('');$('adminGrid').querySelectorAll('select').forEach(el=>el.addEventListener('change',()=>confirmCell(el)));renderDetails();}
+let adminSelectedDay=1;
+function monthWeekGroups(){
+ // Group only dates in the currently selected month; adjacent months never enter totals.
+ const groups=[];let current=[];
+ days.forEach(d=>{const [y,m]=activeMonth.split('-').map(Number);const dow=new Date(Date.UTC(y,m-1,d.day)).getUTCDay();if(dow===1&&current.length){groups.push(current);current=[]}current.push(d.day)});
+ if(current.length)groups.push(current);
+ return groups;
+}
+function renderAdmin(){
+ const names=mapStaff();$('staffCount').textContent=data.staff.length;
+ $('requestCount').textContent=data.availability.length;
+ $('confirmedCount').textContent=`${data.confirmed.length} / ${days.length*3}`;
+ $('staffTags').innerHTML=data.staff.map(x=>`<span class="tag">${safe(x.name)}</span>`).join('');
+ const sel=$('filterStaff'),previous=sel.value;
+ sel.innerHTML='<option value="all">전체 직원</option>'+data.staff.map(x=>`<option value="${safe(x.id)}">${safe(x.name)}</option>`).join('');
+ sel.value=[...sel.options].some(o=>o.value===previous)?previous:'all';
+ if(!days.some(d=>d.day===adminSelectedDay))adminSelectedDay=1;
+ renderAdminCalendar();renderDetails();
+}
+function renderAdminCalendar(){
+ const names=mapStaff();const [year,month]=activeMonth.split('-').map(Number);
+ const padding=(new Date(Date.UTC(year,month-1,1)).getUTCDay()+6)%7;
+ const headers=['월','화','수','목','금','토','일'].map((w,i)=>`<div class="cal-weekday ${i===6?'sunday':''}">${w}</div>`).join('');
+ const blanks=Array.from({length:padding},()=>'<div class="cal-empty" aria-hidden="true"></div>').join('');
+ const cells=days.map(d=>{
+  const picked=data.confirmed.filter(x=>x.day===d.day);
+  const dow=new Date(Date.UTC(year,month-1,d.day)).getUTCDay();
+  const items=slots.map((slot,i)=>{const who=picked.find(c=>c.slot===slot);return `<span class="admin-cal-shift ${who?'filled':''}"><i class="dot d${i+1}"></i><span>${who?safe(names[who.staff_id]||'직원'):'—'}</span></span>`}).join('');
+  return `<button type="button" class="cal-day admin-cal-day ${adminSelectedDay===d.day?'selected':''} ${dow===0?'sunday':''}" data-day="${d.day}" aria-label="${safe(d.label)}, 확정 ${picked.length}명"><b>${d.day}</b><span class="admin-cal-assignments">${items}</span></button>`;
+ }).join('');
+ $('adminCalendar').innerHTML=headers+blanks+cells;
+ $('adminCalendar').querySelectorAll('[data-day]').forEach(b=>b.addEventListener('click',()=>{adminSelectedDay=Number(b.dataset.day);renderAdminCalendar()}));
+ $('adminSelectedDateTitle').textContent=`${month}월 ${adminSelectedDay}일 (${weekday[new Date(Date.UTC(year,month-1,adminSelectedDay)).getUTCDay()]})`;
+ $('adminDaySlots').innerHTML=slots.map((slot,i)=>{
+  const eligible=data.availability.filter(a=>a.day===adminSelectedDay&&a.slot===slot);
+  const confirmed=data.confirmed.find(c=>c.day===adminSelectedDay&&c.slot===slot);
+  const opts=eligible.map(a=>`<option value="${safe(a.staff_id)}" ${confirmed?.staff_id===a.staff_id?'selected':''}>${safe(names[a.staff_id]||'직원')}</option>`).join('');
+  return `<label class="admin-slot-row"><span><i class="dot d${i+1}"></i><b>${slot}</b><small>${['09:00~15:00','10:00~16:00','15:00~21:00'][i]}</small></span><select data-day="${adminSelectedDay}" data-slot="${slot}" aria-label="${slot} 담당자"><option value="">미배정</option>${opts}</select></label>`;
+ }).join('');
+ $('adminDaySlots').querySelectorAll('select').forEach(el=>el.addEventListener('change',()=>confirmCell(el)));
+ renderWeeklySummaries();
+}
+function renderWeeklySummaries(){
+ const groups=monthWeekGroups();
+ const staff=data.staff;
+ $('adminWeeklySummaries').innerHTML=groups.map((g,i)=>{
+  const lines=staff.map(s=>{
+   const shifts=data.confirmed.filter(c=>g.includes(Number(c.day))&&c.staff_id===s.id).length;
+   return `<span class="week-hours-staff"><span>${safe(s.name)}</span><strong>${shifts*6}시간</strong><small>${shifts}회</small></span>`;
+  }).join('');
+  return `<div class="week-summary-row"><div class="week-title">${i+1}주차 <small>${Number(activeMonth.split('-')[1])}/${g[0]} ~ ${Number(activeMonth.split('-')[1])}/${g[g.length-1]}</small></div><div class="week-hours">${lines||'<span class="muted">등록된 직원이 없습니다.</span>'}</div></div>`;
+ }).join('');
+}
 async function confirmCell(el){const day=Number(el.dataset.day),slot=el.dataset.slot,chosen=el.value||null;const before=data.confirmed.find(x=>x.day===day&&x.slot===slot)?.staff_id||'';el.disabled=true;msg('adminMsg','시프트 확정 중...');try{await rpc('shift_month_confirm',{p_token:token,p_month:activeMonth,p_day:day,p_slot:slot,p_staff_id:chosen});msg('adminMsg',`${Number(activeMonth.split('-')[1])}/${day} ${slot} 배정을 저장했습니다.`,true);await load()}catch(e){msg('adminMsg',e.message);el.value=before}finally{el.disabled=false}}
 function renderDetails(){const filter=$('filterStaff').value;const staff=data.staff.filter(s=>filter==='all'||s.id===filter);$('staffDetails').innerHTML=staff.map(s=>{const av=data.availability.filter(x=>x.staff_id===s.id);const pref=data.preferences.find(x=>x.staff_id===s.id);const conf=data.confirmed.filter(x=>x.staff_id===s.id);const byDay=days.map(d=>{const got=av.filter(x=>x.day===d.day).map(x=>x.slot);return got.length?`${Number(activeMonth.split('-')[1])}/${d.day}: ${got.join(', ')}`:null}).filter(Boolean);return `<div class="detail"><h3>${safe(s.name)}</h3><p>근무 가능: ${av.length}개 시간대 / ${byDay.length}일</p><p>희망 일수: ${safe(pref?.weekly||'미제출')}</p><p>확정: ${conf.length}일</p><p><b>근무 가능 날짜</b><br>${byDay.length?byDay.map(safe).join('<br>'):'신청 내역 없음'}</p>${pref?.notes?`<p><b>요청사항</b><br>${safe(pref.notes)}</p>`:''}</div>`}).join('')||'<p class="muted">등록된 직원이 없습니다.</p>'}
 $('filterStaff').addEventListener('change',renderDetails);
