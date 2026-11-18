@@ -50,3 +50,17 @@
 .week-hours-staff strong{font-size:14px;color:#2357b7}.week-hours-staff small{color:#8796a9}
 @media(max-width:850px){.admin-calendar-layout{grid-template-columns:1fr}.admin-day-editor{position:static}.week-summary-row{display:block}.week-hours{margin-top:10px}.week-title{min-width:0}}
 @media(max-width:480px){.admin-cal-day{min-height:77px;padding:3px!important}.admin-cal-shift{font-size:8px;gap:2px}.admin-cal-shift .dot{width:4px;height:4px}.week-hours-staff{padding:7px}.admin-slot-row>span{min-width:86px}}
+
+/* Draft/publication separation and per-day custom shift times */
+.publish-toolbar{background:#eff5ff;border:1px solid #d8e5ff;border-radius:14px;padding:15px 17px;margin-bottom:18px;display:flex;align-items:center;justify-content:space-between;gap:14px}
+.publish-toolbar b{font-size:14px}.publish-toolbar .muted{max-width:570px}.publish-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+.admin-slot-edit{background:white;border:1px solid #e2e9f3;border-radius:12px;padding:13px;margin-bottom:9px}
+.admin-slot-header{display:flex;align-items:center;gap:8px}.admin-slot-header .muted{margin-left:auto}
+.compact-label{margin:8px 0 0;color:#596b82;font-size:11px;font-weight:650}
+.compact-label select,.compact-label input{margin-top:4px;padding:9px;font-size:13px}
+.manual-time-row{display:grid;grid-template-columns:1fr 1fr auto;gap:8px;align-items:end}
+.manual-time-row .save-time{white-space:nowrap;min-height:39px}
+.published-calendar{max-width:720px}.published-day{cursor:default;min-height:88px;align-items:stretch;justify-content:start;gap:5px}
+.published-shifts{display:grid;gap:3px;min-width:0}.published-pill{display:block;background:#e9f2ed;color:#236d4e;border-radius:4px;padding:3px;font-size:9px;font-weight:750;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.published-pill small{display:block;font-size:8px;font-weight:500}
+@media(max-width:700px){.publish-toolbar{flex-direction:column;align-items:stretch}.publish-actions{justify-content:start}.manual-time-row{grid-template-columns:1fr 1fr}.manual-time-row .save-time{grid-column:1/-1}.published-day{min-height:70px}.published-pill{font-size:8px;padding:2px}.published-pill small{font-size:7px}}

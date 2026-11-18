@@ -1,6 +1,10 @@
 const $=id=>document.getElementById(id);
 const slots=['오픈1','오픈2','마감'];
 const weekday=['일','월','화','수','목','금','토'];
+const baseTimes={'오픈1':['09:00','15:00'],'오픈2':['10:00','16:00'],'마감':['15:00','21:00']};
+function draftTime(day,slot){const x=(data.draft_times||[]).find(t=>Number(t.day)===Number(day)&&t.slot===slot);return x?[x.start,x.end]:baseTimes[slot]}
+function hoursBetween(a,b){return Math.max(0,(Number(b.slice(0,2))*60+Number(b.slice(3,5))-Number(a.slice(0,2))*60-Number(a.slice(3,5)))/60)}
+function fmtHours(n){return Number.isInteger(n)?String(n):n.toFixed(1)}
 let activeMonth='';
 let months=[];
 let days=[];
@@ -20,7 +24,7 @@ function configured(){const c=window.SHIFT_CONFIG||{};return c.url?.startsWith('
 async function rpc(fn,params={}){
  const c=window.SHIFT_CONFIG;
  if(!configured())throw Error('사이트 데이터베이스 연결이 아직 설정되지 않았습니다. 관리자에게 문의해 주세요.');
- const resp=await fetch(`${c.url.replace(/\/$/,'')}/rest/v1/rpc/${fn}`,{method:'POST',headers:{'Content-Type':'application/json','apikey':c.anonKey,'Authorization':`Bearer ${c.anonKey}`},body:JSON.stringify(params)});
+ const resp=await fetch(`${c.url.replace(/\/$/,'')}/rest/v1/rpc/${fn}`,{cache:'no-store',method:'POST',headers:{'Content-Type':'application/json','apikey':c.anonKey,'Authorization':`Bearer ${c.anonKey}`},body:JSON.stringify(params)});
  const output=await resp.json().catch(()=>null);
  if(!resp.ok)throw Error(output?.message||`서버 오류 (${resp.status})`);
  return output;
@@ -37,9 +41,22 @@ function renderStaff(){
  $('save').disabled=expired; $('weekly').disabled=expired; $('notes').disabled=expired;
  if(!days.some(d=>d.day===selectedDay))selectedDay=1;
  renderStaffCalendar(); updateCounts();
- const confirmed=data.confirmed;
- $('myConfirmed').innerHTML=confirmed.length?confirmed.map(x=>`<span>${Number(activeMonth.split('-')[1])}/${x.day} · ${safe(x.slot)}</span>`).join(''):'확정된 시프트가 없습니다.';
+ renderPublishedCalendar();
 }
+
+function renderPublishedCalendar(){
+ const entries=data.published||[];
+ const visible=Boolean(data.published_at);
+ $('publishedNotice').textContent=visible?'관리자가 공개한 확정 시프트입니다. (아래 근무시간은 실제 공개된 시간 기준)':'관리자 시프트 초안 작성 중입니다. 확정·공개 전까지는 배정 내용이 표시되지 않습니다.';
+ $('publishedNotice').classList.toggle('closed',!visible);
+ const [y,m]=activeMonth.split('-').map(Number);
+ const pad=(new Date(Date.UTC(y,m-1,1)).getUTCDay()+6)%7;
+ $('publishedCalendar').innerHTML=['월','화','수','목','금','토','일'].map(w=>`<div class="cal-weekday">${w}</div>`).join('')+
+ Array.from({length:pad},()=>'<div class="cal-empty"></div>').join('')+
+ days.map(d=>{const ours=entries.filter(x=>Number(x.day)===d.day);return `<div class="cal-day published-day"><b>${d.day}</b><span class="published-shifts">${ours.map(x=>`<span class="published-pill">${safe(x.slot)}<small>${safe(x.start)}~${safe(x.end)}</small></span>`).join('')}</span></div>`}).join('');
+ $('myConfirmed').textContent=visible?(entries.length?`총 ${entries.length}회 배정되었습니다.`:'현재 배정된 근무가 없습니다.'):'공개 전';
+}
+
 function renderStaffCalendar(){
  const first=(new Date(Number(activeMonth.slice(0,4)),Number(activeMonth.slice(5))-1,1).getDay()+6)%7;
  const weekdays=['월','화','수','목','금','토','일'];
@@ -75,6 +92,8 @@ function monthWeekGroups(){
 function renderAdmin(){
  const names=mapStaff();$('staffCount').textContent=data.staff.length;
  $('requestCount').textContent=data.availability.length;
+ $('publishStatus').textContent=data.published_at?'직원에게 공개됨 · '+deadlineText(data.published_at):'직원에게 아직 비공개';
+ $('unpublishMonth').disabled=!data.published_at;
  $('confirmedCount').textContent=`${data.confirmed.length} / ${days.length*3}`;
  $('staffTags').innerHTML=data.staff.map(x=>`<span class="tag">${safe(x.name)}</span>`).join('');
  const sel=$('filterStaff'),previous=sel.value;
@@ -100,10 +119,14 @@ function renderAdminCalendar(){
  $('adminDaySlots').innerHTML=slots.map((slot,i)=>{
   const eligible=data.availability.filter(a=>a.day===adminSelectedDay&&a.slot===slot);
   const confirmed=data.confirmed.find(c=>c.day===adminSelectedDay&&c.slot===slot);
+  const [from,to]=draftTime(adminSelectedDay,slot);
   const opts=eligible.map(a=>`<option value="${safe(a.staff_id)}" ${confirmed?.staff_id===a.staff_id?'selected':''}>${safe(names[a.staff_id]||'직원')}</option>`).join('');
-  return `<label class="admin-slot-row"><span><i class="dot d${i+1}"></i><b>${slot}</b><small>${['09:00~15:00','10:00~16:00','15:00~21:00'][i]}</small></span><select data-day="${adminSelectedDay}" data-slot="${slot}" aria-label="${slot} 담당자"><option value="">미배정</option>${opts}</select></label>`;
+  return `<div class="admin-slot-edit"><div class="admin-slot-header"><i class="dot d${i+1}"></i><b>${slot}</b><span class="muted">${eligible.length}명 신청</span></div>
+  <label class="compact-label">배정 직원<select data-day="${adminSelectedDay}" data-slot="${slot}" class="staff-assignee"><option value="">미배정</option>${opts}</select></label>
+  <div class="manual-time-row"><label class="compact-label">시작<input class="start-time" type="time" value="${from}" step="300" aria-label="${slot} 시작 시간"></label><label class="compact-label">종료<input class="end-time" type="time" value="${to}" step="300" aria-label="${slot} 종료 시간"></label><button class="ghost save-time" type="button" data-day="${adminSelectedDay}" data-slot="${slot}">시간 저장</button></div></div>`;
  }).join('');
- $('adminDaySlots').querySelectorAll('select').forEach(el=>el.addEventListener('change',()=>confirmCell(el)));
+ $('adminDaySlots').querySelectorAll('select.staff-assignee').forEach(el=>el.addEventListener('change',()=>confirmCell(el)));
+ $('adminDaySlots').querySelectorAll('.save-time').forEach(btn=>btn.addEventListener('click',()=>saveDraftTime(btn)));
  renderWeeklySummaries();
 }
 function renderWeeklySummaries(){
@@ -111,13 +134,32 @@ function renderWeeklySummaries(){
  const staff=data.staff;
  $('adminWeeklySummaries').innerHTML=groups.map((g,i)=>{
   const lines=staff.map(s=>{
-   const shifts=data.confirmed.filter(c=>g.includes(Number(c.day))&&c.staff_id===s.id).length;
-   return `<span class="week-hours-staff"><span>${safe(s.name)}</span><strong>${shifts*6}시간</strong><small>${shifts}회</small></span>`;
+   const mine=data.confirmed.filter(c=>g.includes(Number(c.day))&&c.staff_id===s.id);
+   const hours=mine.reduce((sum,c)=>{const [a,b]=draftTime(c.day,c.slot);return sum+hoursBetween(a,b)},0);
+   return `<span class="week-hours-staff"><span>${safe(s.name)}</span><strong>${fmtHours(hours)}시간</strong><small>${mine.length}회</small></span>`;
   }).join('');
   return `<div class="week-summary-row"><div class="week-title">${i+1}주차 <small>${Number(activeMonth.split('-')[1])}/${g[0]} ~ ${Number(activeMonth.split('-')[1])}/${g[g.length-1]}</small></div><div class="week-hours">${lines||'<span class="muted">등록된 직원이 없습니다.</span>'}</div></div>`;
  }).join('');
 }
-async function confirmCell(el){const day=Number(el.dataset.day),slot=el.dataset.slot,chosen=el.value||null;const before=data.confirmed.find(x=>x.day===day&&x.slot===slot)?.staff_id||'';el.disabled=true;msg('adminMsg','시프트 확정 중...');try{await rpc('shift_month_confirm',{p_token:token,p_month:activeMonth,p_day:day,p_slot:slot,p_staff_id:chosen});msg('adminMsg',`${Number(activeMonth.split('-')[1])}/${day} ${slot} 배정을 저장했습니다.`,true);await load()}catch(e){msg('adminMsg',e.message);el.value=before}finally{el.disabled=false}}
+async function confirmCell(el){const day=Number(el.dataset.day),slot=el.dataset.slot,chosen=el.value||null;const before=data.confirmed.find(x=>x.day===day&&x.slot===slot)?.staff_id||'';el.disabled=true;msg('adminMsg','관리자 초안 저장 중...');try{await rpc('shift_month_confirm',{p_token:token,p_month:activeMonth,p_day:day,p_slot:slot,p_staff_id:chosen});msg('adminMsg',`${Number(activeMonth.split('-')[1])}/${day} ${slot} 초안에 저장했습니다. 직원 화면에는 아직 공개되지 않습니다.`,true);await load()}catch(e){msg('adminMsg',e.message);el.value=before}finally{el.disabled=false}}
+async function saveDraftTime(btn){
+ const day=Number(btn.dataset.day),slot=btn.dataset.slot;
+ const container=btn.closest('.admin-slot-edit');
+ const from=container.querySelector('.start-time').value,to=container.querySelector('.end-time').value;
+ if(!from||!to||hoursBetween(from,to)<=0){msg('adminMsg','시작·종료 시간을 확인해 주세요.');return}
+ btn.disabled=true;
+ try{await rpc('shift_draft_time_save',{p_token:token,p_month:activeMonth,p_day:day,p_slot:slot,p_start:from,p_end:to});await load();msg('adminMsg',`${day}일 ${slot} ${from}~${to} 시간 변경이 초안에 저장되었습니다.`,true)}catch(e){msg('adminMsg',e.message)}finally{btn.disabled=false}
+}
+$('publishMonth').addEventListener('click',async()=>{
+ if(!window.confirm(`${monthLabel(activeMonth)}의 현재 초안을 직원에게 확정 시프트로 공개할까요? 이후 초안을 바꿔도 직원에게는 다시 공개 버튼을 누르기 전까지 반영되지 않습니다.`))return;
+ const btn=$('publishMonth');btn.disabled=true;
+ try{await rpc('shift_month_publish',{p_token:token,p_month:activeMonth});await load();msg('adminMsg','확정 시프트를 직원에게 공개했습니다.',true)}catch(e){msg('adminMsg',e.message)}finally{btn.disabled=false}
+});
+$('unpublishMonth').addEventListener('click',async()=>{
+ if(!window.confirm('확정 공개를 취소하면 직원 달력에서 확정 시프트가 숨겨집니다. 계속할까요?'))return;
+ const btn=$('unpublishMonth');btn.disabled=true;
+ try{await rpc('shift_month_unpublish',{p_token:token,p_month:activeMonth});await load();msg('adminMsg','확정 공개를 취소했습니다. 현재 초안은 유지됩니다.',true)}catch(e){msg('adminMsg',e.message)}finally{btn.disabled=false}
+});
 function renderDetails(){const filter=$('filterStaff').value;const staff=data.staff.filter(s=>filter==='all'||s.id===filter);$('staffDetails').innerHTML=staff.map(s=>{const av=data.availability.filter(x=>x.staff_id===s.id);const pref=data.preferences.find(x=>x.staff_id===s.id);const conf=data.confirmed.filter(x=>x.staff_id===s.id);const byDay=days.map(d=>{const got=av.filter(x=>x.day===d.day).map(x=>x.slot);return got.length?`${Number(activeMonth.split('-')[1])}/${d.day}: ${got.join(', ')}`:null}).filter(Boolean);return `<div class="detail"><h3>${safe(s.name)}</h3><p>근무 가능: ${av.length}개 시간대 / ${byDay.length}일</p><p>희망 일수: ${safe(pref?.weekly||'미제출')}</p><p>확정: ${conf.length}일</p><p><b>근무 가능 날짜</b><br>${byDay.length?byDay.map(safe).join('<br>'):'신청 내역 없음'}</p>${pref?.notes?`<p><b>요청사항</b><br>${safe(pref.notes)}</p>`:''}</div>`}).join('')||'<p class="muted">등록된 직원이 없습니다.</p>'}
 $('filterStaff').addEventListener('change',renderDetails);
 $('monthSelect').addEventListener('change',()=>{activeMonth=$('monthSelect').value;load().catch(e=>alert(e.message))});
@@ -126,8 +168,11 @@ $('monthForm').addEventListener('submit',async e=>{e.preventDefault();msg('month
 
 $('refresh').addEventListener('click',()=>load().catch(e=>msg('adminMsg',e.message)));
 $('addForm').addEventListener('submit',async e=>{e.preventDefault();msg('addMsg','추가 중...');try{await rpc('shift_add_staff',{p_token:token,p_name:$('newName').value,p_pin:$('newPin').value});$('newName').value='';msg('addMsg','직원이 추가되었습니다.',true);await load()}catch(err){msg('addMsg',err.message)}});
-$('exportCsv').addEventListener('click',()=>{const names=mapStaff();const rows=[['날짜','오픈1 (09:00-15:00)','오픈2 (10:00-16:00)','마감 (15:00-21:00)'],...days.map(d=>[d.label,...slots.map(s=>names[data.confirmed.find(x=>x.day===d.day&&x.slot===s)?.staff_id]||'')])];const csv='\ufeff'+rows.map(r=>r.map(v=>'"'+txt(v).replaceAll('"','""')+'"').join(',')).join('\r\n');const url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));const a=document.createElement('a');a.href=url;a.download=`flyingjapan_${activeMonth}_confirmed_shifts.csv`;a.click();URL.revokeObjectURL(url)});
+$('exportCsv').addEventListener('click',()=>{const names=mapStaff();const rows=[['날짜','오픈1','오픈2','마감'],...days.map(d=>[d.label,...slots.map(s=>{const name=names[data.confirmed.find(x=>x.day===d.day&&x.slot===s)?.staff_id]||'';return name?`${name} (${draftTime(d.day,s).join('~')})`:''})])];const csv='\ufeff'+rows.map(r=>r.map(v=>'"'+txt(v).replaceAll('"','""')+'"').join(',')).join('\r\n');const url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));const a=document.createElement('a');a.href=url;a.download=`flyingjapan_${activeMonth}_draft_shifts.csv`;a.click();URL.revokeObjectURL(url)});
 $('pinForm').addEventListener('submit',async e=>{e.preventDefault();try{await rpc('shift_change_pin',{p_token:token,p_new_pin:$('changePin').value});$('changePin').value='';msg('pinMsg','비밀번호가 변경되었습니다.',true)}catch(err){msg('pinMsg',err.message)}});
 $('loginForm').addEventListener('submit',async e=>{e.preventDefault();msg('loginMsg','로그인 중...');try{token=await rpc('shift_login',{p_name:$('username').value.trim(),p_password:$('password').value});sessionStorage.setItem('shiftToken',token);$('password').value='';msg('loginMsg','');await load()}catch(err){msg('loginMsg',err.message)}});
 $('logout').addEventListener('click',showLogin);
 if(token){load().catch(()=>showLogin())}else if(!configured())msg('loginMsg','사이트 데이터베이스가 아직 연결되지 않았습니다. README.md 설정 안내를 확인해 주세요.');
+
+// Admin data is refreshed periodically so withdrawals by employees also clear the draft calendar.
+setInterval(()=>{if(!token||!data?.admin||document.hidden)return;const focused=document.activeElement;if(focused?.matches('input,textarea,select'))return;load().catch(e=>msg('adminMsg',e.message));},20000);
