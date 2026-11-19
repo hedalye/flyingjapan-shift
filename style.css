@@ -64,3 +64,25 @@
 .published-shifts{display:grid;gap:3px;min-width:0}.published-pill{display:block;background:#e9f2ed;color:#236d4e;border-radius:4px;padding:3px;font-size:9px;font-weight:750;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
 .published-pill small{display:block;font-size:8px;font-weight:500}
 @media(max-width:700px){.publish-toolbar{flex-direction:column;align-items:stretch}.publish-actions{justify-content:start}.manual-time-row{grid-template-columns:1fr 1fr}.manual-time-row .save-time{grid-column:1/-1}.published-day{min-height:70px}.published-pill{font-size:8px;padding:2px}.published-pill small{font-size:7px}}
+
+/* Employee monthly published schedule and pre-tax gross-pay estimate */
+.published-layout{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(255px,.75fr);align-items:start;gap:20px;margin-top:12px}
+.published-layout>.pay-summary{position:sticky;top:16px}
+.pay-summary{border:1px solid #dfe7ef;background:#fafcfe;border-radius:14px;padding:17px;min-width:0}
+.pay-summary-head{display:flex;gap:8px;align-items:center;justify-content:space-between;margin-bottom:15px}
+.pay-summary-head h3{font-size:15px;margin:0;color:#25354c}
+.pay-status{font-size:10px;white-space:nowrap;color:#697991;background:#e9eef4;border-radius:40px;padding:5px 8px}
+.pay-status.published{color:#17714c;background:#dff3e9}
+.pay-total,.pay-amount{background:#fff;border:1px solid #e3eaf2;border-radius:11px;padding:15px;margin-bottom:10px;display:flex;flex-direction:column;gap:5px}
+.pay-total small,.pay-amount small{font-size:12px;color:#6c7d92}
+.pay-total strong,.pay-amount strong{font-size:26px;line-height:1.2;font-variant-numeric:tabular-nums;color:#1d416f;letter-spacing:-.4px}
+.pay-total strong span{font-size:13px;font-weight:600;margin-left:3px}
+.pay-amount strong{color:#176b51}.pay-amount>span{color:#728199;font-size:11px}
+.pay-week-title{font-weight:750;font-size:13px;margin:18px 0 9px}
+.pay-week-title small{font-weight:450;color:#7d8b9e;margin-left:6px}
+.pay-week-list{display:grid;gap:5px}
+.pay-week-row{padding:9px 10px;border-radius:8px;background:white;border:1px solid #e6ecf3;display:flex;justify-content:space-between;gap:6px;align-items:center;font-size:12px}
+.pay-week-row small{font-size:10px;color:#8692a4;margin-left:5px}
+.pay-week-row b{font-size:13px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.pay-disclaimer{color:#718199;font-size:11px;line-height:1.65;margin:14px 1px 0}
+@media(max-width:850px){.published-layout{grid-template-columns:1fr}.published-layout>.pay-summary{position:static}.pay-summary{order:2}}
